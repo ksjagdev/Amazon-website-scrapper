@@ -1,0 +1,89 @@
+import csv
+from bs4 import BeautifulSoup
+
+#Microsoft Edge
+
+from selenium import webdriver 
+from msedge.selenium_tools import Edge, EdgeOptions
+
+def get_url(search_term):
+    template = "https://www.amazon.com/s?k={}&crid=SZCW0NF454V2&sprefix=ultrawide+monit%2Caps%2C473&ref=nb_sb_noss_2"
+    search_term = search_term.replace(" ", "+")
+
+    #add term query to url
+    url = template.format(search_term)
+
+    #add page query placeholder
+    url += "$page{}"
+    
+    return url
+
+def extract_record(item):
+    """"Extract and return data from a single record"""
+
+    #description and url
+    atag = item.h2.a
+    description = atag.text.strip()
+    url = "https://www.amazon.com/" + atag.get("href")
+    
+    try:
+        #price
+        price_parent = item.find("span", "a-price")
+        price = price_parent.find("span", "a-offscreen").text
+
+    except AttributeError:
+
+        return
+        
+    #review and rating
+
+    try:
+        rating = item.i.text
+        reviews_count = item.find("span", {"class": "a-size-base", "dir": "auto"})
+
+    except AttributeError:
+
+        rating = ""
+        reviews_count = ""
+
+
+    result = (description, price, rating, reviews_count, url)
+    return result
+
+
+
+def main(search_term):
+
+    """"Run main program routine"""
+
+    #staring the web driver
+    edgeBrowser = webdriver.Edge(executable_path= r"C:\Users\kunwa\OneDrive\Documents\Kunwardeep\Python Scripts\WebScraping\edgedriver_win64\EdgeDriver.exe")
+    
+    
+    url = get_url(search_term)
+
+    
+    records = []
+    for page in range(1,21):
+        edgeBrowser.get(url.format(page))
+        soup = BeautifulSoup(edgeBrowser.page_source, 'html.parser')
+        results = soup.find_all("div", {"data-component-type": "s-search-result"})
+
+        for item in results:
+            record = extract_record(item)
+            if record:
+                records.append(record)
+    
+    edgeBrowser.close()
+
+    # Save data to csv file
+
+    with open('results.csv', 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow({"Description", "Price", "Rating", "ReviewCount", "Url"})
+        writer.writerows(records)
+
+
+    
+
+        
